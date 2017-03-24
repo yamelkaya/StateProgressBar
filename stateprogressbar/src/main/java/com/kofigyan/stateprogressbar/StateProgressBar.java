@@ -16,7 +16,6 @@ import android.widget.Scroller;
 import com.kofigyan.stateprogressbar.utils.FontManager;
 
 import java.util.ArrayList;
-import java.util.List;
 
 
 /**
@@ -26,8 +25,12 @@ import java.util.List;
 public class StateProgressBar extends View {
 
 
+    public static final float EMPTY_CIRCLE_SCALE_RATE = 1.5f;
+    private State[] states;
+    private String unitLabel;
+
     public enum StateNumber {
-        ONE(1), TWO(2), THREE(3), FOUR(4), FIVE(5);
+        ZERO(0), ONE(1), TWO(2), THREE(3), FOUR(4), FIVE(5);
         private int value;
 
         private StateNumber(int value) {
@@ -64,6 +67,8 @@ public class StateProgressBar extends View {
     private float mCellWidth;
 
     private float mCellHeight;
+
+    private float mPaddingHorizontal;
 
     /**
      * next cell(state) from previous cell
@@ -211,15 +216,15 @@ public class StateProgressBar extends View {
 
     private void initializePainters() {
 
-        Typeface typefaceBold = Typeface.create(Typeface.DEFAULT, Typeface.BOLD);
+        Typeface typefaceNormal = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL);
 
-        mBackgroundPaint = setPaintAttributes(mStateLineThickness, mBackgroundColor);
-        mForegroundPaint = setPaintAttributes(mStateLineThickness, mForegroundColor);
-        mStateNumberForegroundPaint = setPaintAttributes(mStateNumberTextSize, mStateNumberForegroundColor, typefaceBold);
+        mBackgroundPaint = setPaintAttributes(mStateLineThickness, mBackgroundColor, Paint.Style.STROKE);
+        mForegroundPaint = setPaintAttributes(mStateLineThickness, mForegroundColor, Paint.Style.FILL_AND_STROKE);
+        mStateNumberForegroundPaint = setPaintAttributes(mStateNumberTextSize, mStateNumberForegroundColor, typefaceNormal);
         mStateCheckedForegroundPaint = setPaintAttributes(mStateNumberTextSize, mStateNumberForegroundColor, mCheckFont);
-        mStateNumberBackgroundPaint = setPaintAttributes(mStateNumberTextSize, mStateNumberBackgroundColor, typefaceBold);
-        mCurrentStateDescriptionPaint = setPaintAttributes(mStateDescriptionSize, mCurrentStateDescriptionColor, typefaceBold);
-        mStateDescriptionPaint = setPaintAttributes(mStateDescriptionSize, mStateDescriptionColor, typefaceBold);
+        mStateNumberBackgroundPaint = setPaintAttributes(mStateNumberTextSize, mStateNumberBackgroundColor, typefaceNormal);
+        mCurrentStateDescriptionPaint = setPaintAttributes(mStateDescriptionSize, mCurrentStateDescriptionColor, typefaceNormal);
+        mStateDescriptionPaint = setPaintAttributes(mStateDescriptionSize, mStateDescriptionColor, typefaceNormal);
 
     }
 
@@ -243,18 +248,10 @@ public class StateProgressBar extends View {
         invalidate();
     }
 
-    public int getBackgroundColor() {
-        return mBackgroundColor;
-    }
-
     public void setForegroundColor(int foregroundColor) {
         mForegroundColor = foregroundColor;
         mForegroundPaint.setColor(mForegroundColor);
         invalidate();
-    }
-
-    public int getForegroundColor() {
-        return mForegroundColor;
     }
 
     public void setStateLineThickness(float stateLineThickness) {
@@ -265,18 +262,10 @@ public class StateProgressBar extends View {
         invalidate();
     }
 
-    public float getStateLineThickness() {
-        return mStateLineThickness;
-    }
-
     public void setStateNumberBackgroundColor(int stateNumberBackgroundColor) {
         mStateNumberBackgroundColor = stateNumberBackgroundColor;
         mStateNumberBackgroundPaint.setColor(mStateNumberBackgroundColor);
         invalidate();
-    }
-
-    public int getStateNumberBackgroundColor() {
-        return mStateNumberBackgroundColor;
     }
 
     public void setStateNumberForegroundColor(int stateNumberForegroundColor) {
@@ -286,18 +275,10 @@ public class StateProgressBar extends View {
         invalidate();
     }
 
-    public int getStateNumberForegroundColor() {
-        return mStateNumberForegroundColor;
-    }
-
     public void setStateDescriptionColor(int stateDescriptionColor) {
         mStateDescriptionColor = stateDescriptionColor;
         mStateDescriptionPaint.setColor(mStateDescriptionColor);
         invalidate();
-    }
-
-    public int getStateDescriptionColor() {
-        return mStateDescriptionColor;
     }
 
     public void setCurrentStateDescriptionColor(int currentStateDescriptionColor) {
@@ -306,50 +287,29 @@ public class StateProgressBar extends View {
         invalidate();
     }
 
-    public int getCurrentStateDescriptionColor() {
-        return mCurrentStateDescriptionColor;
-    }
-
-    public void setCurrentStateNumber(StateNumber currentStateNumber) {
-        validateStateNumber(currentStateNumber.getValue());
-        mCurrentStateNumber = currentStateNumber.getValue();
+    public void setCurrentStateNumber(int currentStateNumber) {
+        validateStateNumber(currentStateNumber);
+        mCurrentStateNumber = currentStateNumber;
         updateCheckAllStatesValues(mEnableAllStatesCompleted);
+        recalculateCellParams();
+        recalculateBarState();
         invalidate();
     }
 
-    public int getCurrentStateNumber() {
-        return mCurrentStateNumber;
-    }
-
-
-    public void setMaxStateNumber(StateNumber maximumState) {
-        mMaxStateNumber = maximumState.getValue();
+    public void setMaxStateNumber(int maximumState) {
+        mMaxStateNumber = maximumState;
         validateStateNumber(mCurrentStateNumber);
         updateCheckAllStatesValues(mEnableAllStatesCompleted);
+        recalculateCellParams();
+        recalculateBarState();
         invalidate();
     }
-
-    public int getMaxStateNumber() {
-        return mMaxStateNumber;
-    }
-
 
     public void setStateSize(float stateSize) {
         mStateSize = convertDpToPixel(stateSize);
         mIsStateSizeSet = true;
         resetStateSizeValues();
     }
-
-    public float getStateSize() {
-        return mStateSize;
-    }
-
-    public void setStateNumberTextSize(float textSize) {
-        mStateNumberTextSize = convertSpToPixel(textSize);
-        mIsStateTextSizeSet = true;
-        resetStateSizeValues();
-    }
-
 
     private void resetStateSizeValues() {
 
@@ -373,22 +333,6 @@ public class StateProgressBar extends View {
         mCurrentStateDescriptionPaint.setTextSize(mStateDescriptionSize);
         mStateDescriptionPaint.setTextSize(mStateDescriptionSize);
         requestLayout();
-    }
-
-    public float getStateNumberTextSize() {
-        return mStateNumberTextSize;
-    }
-
-    public void checkStateCompleted(boolean checkStateCompleted) {
-        mCheckStateCompleted = checkStateCompleted;
-        invalidate();
-    }
-
-
-    public void setAllStatesCompleted(boolean enableAllStatesCompleted) {
-        mEnableAllStatesCompleted = enableAllStatesCompleted;
-        updateCheckAllStatesValues(mEnableAllStatesCompleted);
-        invalidate();
     }
 
     private void updateCheckAllStatesValues(boolean enableAllStatesCompleted) {
@@ -424,42 +368,14 @@ public class StateProgressBar extends View {
         requestLayout();
     }
 
-
-    public void setDescriptionTopSpaceDecrementer(float spaceDecrementer) {
-        mDescTopSpaceDecrementer = spaceDecrementer;
-        requestLayout();
-    }
-
-    public float getDescriptionTopSpaceDecrementer() {
-        return mDescTopSpaceDecrementer;
-    }
-
-    public float getDescriptionTopSpaceIncrementer() {
-        return mDescTopSpaceIncrementer;
+    public void setUnit(String unitLabel) {
+        this.unitLabel = unitLabel;
     }
 
 
-    public void setAnimationDuration(int animDuration) {
-        mAnimDuration = animDuration;
-        invalidate();
-    }
-
-    public int getAnimationDuration() {
-        return mAnimDuration;
-    }
-
-    public void setAnimationStartDelay(int animStartDelay) {
-        mAnimStartDelay = animStartDelay;
-        invalidate();
-    }
-
-    public int getAnimationStartDelay() {
-        return mAnimStartDelay;
-    }
-
-    private Paint setPaintAttributes(float strokeWidth, int color) {
+    private Paint setPaintAttributes(float strokeWidth, int color, Paint.Style style) {
         Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        paint.setStyle(Paint.Style.FILL);
+        paint.setStyle(style);
         paint.setStrokeWidth(strokeWidth);
         paint.setColor(color);
         return paint;
@@ -467,7 +383,7 @@ public class StateProgressBar extends View {
 
     private Paint setPaintAttributes(float textSize, int color, Typeface typeface) {
         Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        paint.setStyle(Paint.Style.FILL);
+        paint.setStyle(Paint.Style.FILL_AND_STROKE);
         paint.setTextAlign(Paint.Align.CENTER);
         paint.setTextSize(textSize);
         paint.setColor(color);
@@ -490,7 +406,7 @@ public class StateProgressBar extends View {
         mStateDescriptionSize = 15f;
 
         mMaxStateNumber = StateNumber.FIVE.getValue();
-        mCurrentStateNumber = StateNumber.ONE.getValue();
+        mCurrentStateNumber = StateNumber.ZERO.getValue();
 
         mSpacing = 4.0f;
 
@@ -548,18 +464,26 @@ public class StateProgressBar extends View {
 
     }
 
-    private void drawCircles(Canvas canvas, Paint paint, int startIndex, int endIndex) {
+    private void drawCircles(Canvas canvas, Paint paint, int startIndex, int endIndex, float radius) {
         for (int i = startIndex; i < endIndex; i++) {
-            canvas.drawCircle(mCellWidth * (i + 1) - (mCellWidth / 2), mCellHeight / 2, mStateRadius, paint);
+            canvas.drawCircle(mPaddingHorizontal + mCellWidth * (i + 1) - (mCellWidth / 2), mCellHeight / 2, radius, paint);
         }
     }
 
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
+        recalculateCellParams();
+    }
 
-        mCellWidth = getWidth() / mMaxStateNumber;
+    private void recalculateCellParams() {
+        mPaddingHorizontal = getWidth()*0f;
+        mCellWidth = (getWidth() - mPaddingHorizontal*2) / getCellsNumber();
         mNextCellWidth = mCellWidth;
+    }
+
+    private int getCellsNumber() {
+        return Math.min(mMaxStateNumber, StateNumber.FIVE.getValue());
     }
 
     @Override
@@ -582,230 +506,103 @@ public class StateProgressBar extends View {
 
     }
 
-
     private int getDesiredHeight() {
-        if (mStateDescriptionData.isEmpty()) {
-            return (int) (2 * mStateRadius) + (int) (mSpacing);
-        } else {
-            return (int) (2 * mStateRadius) + (int) (1.3 * mStateDescriptionSize) + (int) (mSpacing) - (int) (mDescTopSpaceDecrementer) + (int) (mDescTopSpaceIncrementer);  // mStageHeight = mCellHeight + ( 2 * description Text Size)
-        }
+        return (int) (2 * EMPTY_CIRCLE_SCALE_RATE * mStateRadius) + (int) (1.3 * mStateDescriptionSize) + (int) (mSpacing) - (int) (mDescTopSpaceDecrementer) + (int) (mDescTopSpaceIncrementer);  // mStageHeight = mCellHeight + ( 2 * description Text Size)
     }
 
     private int getCellHeight() {
-        return (int) (2 * mStateRadius) + (int) (mSpacing);
+        return (int) (2 * EMPTY_CIRCLE_SCALE_RATE * mStateRadius) + (int) (mSpacing);
     }
 
     private void drawState(Canvas canvas) {
+        if (mMaxStateNumber > 0) {
+            for (int i=0; i<states.length; i++){
+                State state = states[i];
+                float radius = state.filled ? mStateRadius : mStateRadius * EMPTY_CIRCLE_SCALE_RATE;
+                Paint paint = state.filled ? mForegroundPaint : mBackgroundPaint;
 
-        setAnimatorStartEndCenterX();
+                drawCircles(canvas, paint, i, i+1, radius);
+                drawStateDescriptionText(canvas, mStateDescriptionPaint, i, state.value);
 
-        drawCurrentStateJoiningLine(canvas);
-
-        drawLines(canvas, mBackgroundPaint, mCurrentStateNumber - 1, mMaxStateNumber);
-
-        drawCircles(canvas, mBackgroundPaint, mCurrentStateNumber, mMaxStateNumber);
-        drawCircles(canvas, mForegroundPaint, 0, mCurrentStateNumber);
-
-        drawLines(canvas, mForegroundPaint, 0, mCurrentStateNumber - 1);
-
-        drawStateNumberText(canvas, mMaxStateNumber);
-        drawStateDescriptionText(canvas);
-
-    }
-
-    private void drawLines(Canvas canvas, Paint paint, int startIndex, int endIndex) {
-
-        float startCenterX;
-        float endCenterX;
-
-        float startX;
-        float stopX;
-
-
-        if (endIndex > startIndex) {
-
-            startCenterX = mCellWidth / 2 + mCellWidth * startIndex;
-
-            endCenterX = mCellWidth * endIndex - (mCellWidth / 2);
-
-            startX = startCenterX + (mStateRadius * 0.75f);
-            stopX = endCenterX - (mStateRadius * 0.75f);
-
-            canvas.drawLine(startX, mCellHeight / 2, stopX, mCellHeight / 2, paint);
-
-        }
-
-    }
-
-
-    private void setAnimatorStartEndCenterX() {
-        if (mCurrentStateNumber > MIN_STATE_NUMBER && mCurrentStateNumber < MAX_STATE_NUMBER + 1) {
-            for (int i = 0; i < mCurrentStateNumber - 1; i++) {
-
-                if (i == 0) {
-                    mStartCenterX = mNextCellWidth - (mCellWidth / 2);
-                } else {
-                    mStartCenterX = mEndCenterX;
+                boolean hasGapWithNext = hasGap(i,i+1);
+                boolean hasGapWithPrev = hasGap(i-1,i);
+                if (hasGapWithNext){
+                    drawGap(canvas, mBackgroundPaint, i, mStateRadius * EMPTY_CIRCLE_SCALE_RATE);
                 }
-
-                mNextCellWidth += mCellWidth;
-                mEndCenterX = mNextCellWidth - (mCellWidth / 2);
+                drawLines(canvas, mForegroundPaint, i, hasGapWithPrev, hasGapWithNext, radius);
             }
-        } else {
-            resetStateAnimationData();
         }
     }
 
-    private void drawCurrentStateJoiningLine(Canvas canvas) {
-        if (mAnimateToCurrentProgressState) {
-            animateToCurrentState(canvas);
-        } else {
-            drawLineToCurrentState(canvas);
-        }
+    private boolean hasGap(int i, int j){
+        return i >= 0 && j >= 0 && states.length > i && states.length > j && Math.abs(states[i].value - states[j].value) > 1;
     }
 
-    private void drawLineToCurrentState(Canvas canvas) {
+    private void recalculateBarState() {
+        int cellsNumber = getCellsNumber();
+        states = new State[cellsNumber];
 
-        canvas.drawLine(mStartCenterX, mCellHeight / 2, mEndCenterX, mCellHeight / 2, mForegroundPaint);
-
-        mNextCellWidth = mCellWidth;
-
-        stopAnimation();
-    }
-
-    private void animateToCurrentState(Canvas canvas) {
-        if (!mIsCurrentAnimStarted) {
-            mAnimStartXPos = mStartCenterX;
-            mAnimEndXPos = mAnimStartXPos;
-            mIsCurrentAnimStarted = true;
-        }
-
-        if (mAnimEndXPos < mStartCenterX || mStartCenterX > mEndCenterX) {
-            stopAnimation();
-            enableAnimationToCurrentState(false);
-            invalidate();
-        } else if (mAnimEndXPos <= mEndCenterX) {
-            canvas.drawLine(mStartCenterX, mCellHeight / 2, mAnimEndXPos, mCellHeight / 2, mForegroundPaint);
-
-            canvas.drawLine(mAnimEndXPos, mCellHeight / 2, mEndCenterX, mCellHeight / 2, mBackgroundPaint);
-
-            mAnimStartXPos = mAnimEndXPos;
-
-        } else {
-
-            canvas.drawLine(mStartCenterX, mCellHeight / 2, mEndCenterX, mCellHeight / 2, mForegroundPaint);
-        }
-
-        mNextCellWidth = mCellWidth;
-    }
-
-    private void drawStateDescriptionText(Canvas canvas) {
-
-        int xPos;
-        int yPos;
-        Paint innerPaintType;
-
-        if (!mStateDescriptionData.isEmpty()) {
-
-            for (int i = 0; i < mStateDescriptionData.size(); i++) {
-                if (i < mMaxStateNumber) {
-                    innerPaintType = selectDescriptionPaint(mCurrentStateNumber, i);
-                    xPos = (int) (mNextCellWidth - (mCellWidth / 2));
-                    yPos = (int) (mCellHeight + mStateDescriptionSize - mSpacing - mDescTopSpaceDecrementer + mDescTopSpaceIncrementer);//mSpacing = mStateNumberForegroundPaint.getTextSize()
-
-                    canvas.drawText(mStateDescriptionData.get(i), xPos, yPos, innerPaintType);
-
-                    mNextCellWidth += mCellWidth;
+        for (int i=0; i<states.length; i++){
+            int value;
+            if (i == 0){
+                value = mMaxStateNumber;
+            }
+            else {
+                if (mMaxStateNumber - mCurrentStateNumber < cellsNumber - 1){
+                    value = mMaxStateNumber - i;
+                }
+                else if (mCurrentStateNumber < cellsNumber - 2){
+                    value = cellsNumber - i;
+                }
+                else {
+                    value = (mCurrentStateNumber + 2 - i);
                 }
             }
-
-        }
-
-        mNextCellWidth = mCellWidth;
-    }
-
-    private Paint selectDescriptionPaint(int currentState, int statePosition) {
-        if (statePosition + 1 == currentState) {
-            return mCurrentStateDescriptionPaint;
-        } else {
-            return mStateDescriptionPaint;
+            boolean filled = value <= mCurrentStateNumber;
+            states[cellsNumber - i -1] = new State(value,filled);
         }
     }
 
-    public void setStateDescriptionData(String[] stateDescriptionData) {
+    private void drawStartPaddingLine(Canvas canvas, Paint paint) {
+        canvas.drawLine(0, mCellHeight / 2, mPaddingHorizontal, mCellHeight / 2, paint);
+    }
 
-        for (String value : stateDescriptionData) {
-            mStateDescriptionData.add(value);
+    private void drawEndPaddingLine(Canvas canvas, Paint paint) {
+        canvas.drawLine(getWidth() - mPaddingHorizontal, mCellHeight / 2, getWidth(), mCellHeight / 2, paint);
+    }
+
+    private void drawLines(Canvas canvas, Paint paint, int index, boolean leftGap, boolean rightGap, float radius) {
+        float cellStart = mPaddingHorizontal + mCellWidth * index;
+        float cellEnd = mPaddingHorizontal + mCellWidth * (index + 1);
+        float cellCenter = cellStart + mCellWidth / 2;
+        float circleStart = cellCenter - radius;
+        float circleEnd = cellCenter + radius;
+
+        if (!leftGap) {
+            canvas.drawLine(cellStart, mCellHeight / 2, circleStart - 1, mCellHeight / 2, paint);
         }
-
-        requestLayout();
+        if (!rightGap) {
+            canvas.drawLine(circleEnd + 1, mCellHeight / 2, cellEnd, mCellHeight / 2, paint);
+        }
     }
 
-    public void setStateDescriptionData(ArrayList<String> stateDescriptionData) {
-        mStateDescriptionData = stateDescriptionData;
-
-        requestLayout();
-    }
-
-    public List<String> getStateDescriptionData() {
-        return mStateDescriptionData;
-    }
-
-    private void resetStateAnimationData() {
-        if (mStartCenterX > 0 || mStartCenterX < 0) mStartCenterX = 0;
-        if (mEndCenterX > 0 || mEndCenterX < 0) mEndCenterX = 0;
-        if (mAnimEndXPos > 0 || mAnimEndXPos < 0) mAnimEndXPos = 0;
-        if (mIsCurrentAnimStarted) mIsCurrentAnimStarted = false;
-    }
-
-
-    private void drawStateNumberText(Canvas canvas, int noOfCircles) {
-
-        int xPos;
-        int yPos;
-        Paint innerPaintType;
-        boolean isChecked;
-
-        for (int i = 0; i < noOfCircles; i++) {
-
-            innerPaintType = selectPaintType(mCurrentStateNumber, i, mCheckStateCompleted);
-
-            xPos = (int) (mCellWidth * (i + 1) - (mCellWidth / 2));
-
-            yPos = (int) ((mCellHeight / 2) - ((innerPaintType.descent() + innerPaintType.ascent()) / 2));
-
-            isChecked = isCheckIconUsed(mCurrentStateNumber, i);
-
-            if (mCheckStateCompleted && isChecked) {
-                canvas.drawText(getContext().getString(R.string.check_icon), xPos, yPos, innerPaintType);
-            } else {
-                canvas.drawText(String.valueOf(i + 1), xPos, yPos, innerPaintType);
+    private void drawGap(Canvas canvas, Paint paint, Integer gapAfter, float radius) {
+        if (gapAfter != null){
+            float gapWidth = mCellWidth - radius*2;
+            for (int j=0; j<3; j++){
+                canvas.drawCircle(mPaddingHorizontal + mCellWidth * (gapAfter+1) + gapWidth/4 *(j-1), mCellHeight/2, 2, paint);
             }
         }
-
     }
 
+    private void drawStateDescriptionText(Canvas canvas, Paint paint, int i, int value) {
+        int xPos;
+        int yPos;
+        xPos = (int) (mPaddingHorizontal + mCellWidth*(i+1) - (mCellWidth / 2));
+        yPos = (int) (mCellHeight + mStateDescriptionSize - mSpacing - mDescTopSpaceDecrementer + mDescTopSpaceIncrementer);//mSpacing = mStateNumberForegroundPaint.getTextSize()
 
-    private Paint selectPaintType(int currentState, int statePosition, boolean checkStateCompleted) {
-
-        if ((mEnableAllStatesCompleted && checkStateCompleted) || (statePosition + 1 < currentState && checkStateCompleted)) {
-            return mStateCheckedForegroundPaint;
-        } else if ((statePosition + 1 == currentState) || (statePosition + 1 < currentState && !checkStateCompleted)) {
-            return mStateNumberForegroundPaint;
-        } else {
-            return mStateNumberBackgroundPaint;
-        }
+        canvas.drawText(String.valueOf(value) + (i == states.length - 1 ? (" " + unitLabel) : ""), xPos, yPos, paint);
     }
-
-
-    private boolean isCheckIconUsed(int currentState, int statePosition) {
-        if (mEnableAllStatesCompleted || statePosition + 1 < currentState) {
-            return true;
-        } else {
-            return false;
-        }
-    }
-
 
     private void startAnimator() {
         mAnimator = new Animator();
@@ -953,5 +750,13 @@ public class StateProgressBar extends View {
         super.onRestoreInstanceState(state);
     }
 
+    private class State{
+        private int value;
+        private boolean filled;
 
+        public State(int value, boolean filled) {
+            this.value = value;
+            this.filled = filled;
+        }
+    }
 }
